@@ -1,0 +1,104 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <title>ScreenVault</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="popup.css">
+</head>
+<body>
+  <div id="app">
+    
+    <!-- Screen 1: Idle -->
+    <div id="screen-idle" class="screen active">
+      <div class="header">
+        <span>ScreenVault</span>
+        <div class="actions">
+          <button id="btn-settings">⚙</button>
+          <button id="btn-add-account">[+]</button>
+        </div>
+      </div>
+      <div class="main-action">
+        <button id="btn-new-recording" class="primary-btn">
+          <span class="dot"></span> New Recording
+          <span class="arrow">›</span>
+        </button>
+      </div>
+      <div class="debug-actions" style="margin-top: 8px;">
+        <button id="btn-connect-mock" class="secondary-btn" style="border-style: dashed; opacity: 0.6; font-size: 11px;">[DEBUG] Connect Mock Account</button>
+      </div>
+      <div class="accounts-section">
+        <div class="accounts-header">Connected · <span id="account-count">0</span> accounts</div>
+        <div id="accounts-list" class="accounts-list"></div>
+      </div>
+    </div>
+
+    <!-- Screen 2: Tab Picker -->
+    <div id="screen-tab-select" class="screen">
+      <div class="header">
+        <button id="btn-back" class="icon-btn">←</button>
+        <span>Choose what to record</span>
+      </div>
+      <div class="options-list">
+        <button id="btn-record-screen" class="tab-card">🖥 Entire Screen</button>
+        <button id="btn-record-window" class="tab-card">▣ Application Window</button>
+      </div>
+      <div class="divider"></div>
+      <div class="search-box">
+        <input type="text" id="tab-filter" placeholder="🔍 Filter tabs...">
+      </div>
+      <div id="tabs-list" class="tabs-list"></div>
+    </div>
+
+    <!-- Screen 3: Recording Active -->
+    <div id="screen-recording" class="screen center-content">
+      <div class="recording-indicator">
+        <span class="dot pulsing"></span>
+        <span>Recording now</span>
+        <span id="recording-timer" class="mono">00:00:00</span>
+      </div>
+      <div id="recording-target-title" class="target-title"></div>
+      <button id="btn-stop-recording" class="stop-btn">
+        <span class="square">■</span> Stop & Upload
+      </button>
+    </div>
+
+    <!-- Screen 4: Processing/Uploading -->
+    <div id="screen-uploading" class="screen center-content">
+      <div class="status-title">Uploading...</div>
+      <div class="progress-bar-container">
+        <div id="upload-progress-fill" class="progress-fill shimmer" style="width: 0%"></div>
+      </div>
+      <div id="upload-percent" class="mono">0%</div>
+      <div id="upload-target-account" class="target-account"></div>
+      <button id="btn-cancel-upload" class="cancel-btn">
+        <span class="square">■</span> Cancel
+      </button>
+    </div>
+
+    <!-- Screen 5: Success -->
+    <div id="screen-success" class="screen center-content">
+      <div class="success-title">✓ Link copied to clipboard</div>
+      <div class="actions-row">
+        <button id="btn-copy-link" class="secondary-btn">Copy again</button>
+        <button id="btn-open-link" class="secondary-btn">Open</button>
+      </div>
+      <div id="success-details" class="success-details mono"></div>
+    </div>
+
+    <!-- Screen 6: Error -->
+    <div id="screen-error" class="screen center-content">
+      <div class="error-title">⚠ Upload failed</div>
+      <div id="error-reason" class="error-reason"></div>
+      <div class="actions-row">
+        <button id="btn-save-disk" class="secondary-btn">Save to disk</button>
+        <button id="btn-retry" class="secondary-btn">Retry</button>
+      </div>
+    </div>
+
+  </div>
+  <script type="module" src="popup.js"></script>
+</body>
+</html>

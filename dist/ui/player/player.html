@@ -1,0 +1,51 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <title>ScreenVault — Video Player</title>
+    <link rel="stylesheet" href="../../popup/popup.css">
+    <style>
+        body {
+            width: auto;
+            min-height: 100vh;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            padding: 40px;
+            background: #000;
+        }
+        .player-container {
+            width: 100%;
+            max-width: 1200px;
+            background: var(--surface);
+            border: 1px solid var(--border);
+            border-radius: 12px;
+            padding: 24px;
+            display: flex;
+            flex-direction: column;
+            gap: 24px;
+        }
+        video {
+            width: 100%;
+            border-radius: 8px;
+            background: #000;
+        }
+        .player-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+    </style>
+</head>
+<body>
+    <div class="player-container">
+        <div class="player-header">
+            <h2>Recording Preview (Mock)</h2>
+            <button id="btn-download" class="primary-btn" style="width: auto;">Download WebM</button>
+        </div>
+        <video id="video-player" controls autoplay></video>
+        <div id="video-info" class="mono" style="color: var(--text-secondary);"></div>
+    </div>
+    <script type="module" src="player.js"></script>
+</body>
+</html>

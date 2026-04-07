@@ -1,0 +1,14 @@
+{
+  "name": "screenvault",
+  "version": "1.0.0",
+  "description": "Record your screen and share instantly",
+  "scripts": {
+    "build": "mkdir -p dist/popup dist/ui/player && cp src/offscreen/offscreen.html dist/ && cp src/ui/popup/popup.html dist/popup/ && cp src/ui/popup/popup.css dist/popup/ && cp src/content/content.css dist/ && cp src/ui/player/player.html dist/ui/player/ && esbuild src/background/service-worker.ts --bundle --outfile=dist/service-worker.js --format=esm && esbuild src/offscreen/offscreen.ts --bundle --outfile=dist/offscreen.js --format=esm && esbuild src/ui/popup/popup.ts --bundle --outfile=dist/popup/popup.js --format=esm && esbuild src/content/content.ts --bundle --outfile=dist/content.js --format=esm && esbuild src/ui/player/player.ts --bundle --outfile=dist/ui/player/player.js --format=esm",
+    "watch": "npm run build && esbuild src/background/service-worker.ts src/offscreen/offscreen.ts src/ui/popup/popup.ts --bundle --outdir=dist --format=esm --watch"
+  },
+  "devDependencies": {
+    "@types/chrome": "^0.0.268",
+    "esbuild": "^0.21.5",
+    "typescript": "^5.4.5"
+  }
+}
