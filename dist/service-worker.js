@@ -101,13 +101,18 @@ var ChromeTabsAdapter = class {
 
 // src/logger/logger.ts
 var DEBUG_MODE = true;
+var COLORS = {
+  debug: "#6B7280",
+  info: "#3B82F6",
+  warn: "#F59E0B",
+  error: "#EF4444"
+};
 var Logger = class {
   logBuffer = [];
-  maxBufferSize = 500;
+  maxBufferSize = 1e3;
+  startTime = Date.now();
   log(level, module, action, data, sessionId) {
-    if (!DEBUG_MODE && level === "debug") {
-      return;
-    }
+    if (!DEBUG_MODE && level === "debug") return;
     const entry = {
       ts: (/* @__PURE__ */ new Date()).toISOString(),
       level,
@@ -118,10 +123,21 @@ var Logger = class {
     };
     this.logBuffer.push(entry);
     if (this.logBuffer.length > this.maxBufferSize) this.logBuffer.shift();
+    const elapsed = `+${((Date.now() - this.startTime) / 1e3).toFixed(2)}s`;
+    const prefix = `[SV:${module}] [${elapsed}]`;
     try {
-      console.log(JSON.stringify(entry));
+      if (level === "error") {
+        console.error(`%c${prefix} ${action}`, `color: ${COLORS[level]}; font-weight: bold`, data ?? "");
+      } else if (level === "warn") {
+        console.warn(`%c${prefix} ${action}`, `color: ${COLORS[level]}`, data ?? "");
+      } else if (level === "debug") {
+        console.log(`%c${prefix} ${action}`, `color: ${COLORS[level]}`, data ?? "");
+      } else {
+        console.log(`%c${prefix} ${action}`, `color: ${COLORS[level]}; font-weight: bold`, data ?? "");
+      }
+      console.debug(JSON.stringify(entry));
     } catch (e) {
-      console.log(`{"ts":"${(/* @__PURE__ */ new Date()).toISOString()}","level":"error","module":"Logger","action":"LOG_FAILED"}`);
+      console.log(`{LOG_FAILED}`);
     }
   }
   getLogs() {
@@ -129,6 +145,13 @@ var Logger = class {
   }
   clearLogs() {
     this.logBuffer = [];
+  }
+  dumpLogs() {
+    console.group("%c[ScreenVault] \u2014 Full Log Dump", "font-weight: bold; font-size: 14px;");
+    this.logBuffer.forEach((e) => {
+      console.log(`%c[${e.level.toUpperCase()}] [${e.module}] ${e.action}`, `color:${COLORS[e.level]}`, e.data ?? "", `| ${e.ts}`);
+    });
+    console.groupEnd();
   }
   debug(module, action, data, sessionId) {
     this.log("debug", module, action, data, sessionId);
@@ -532,8 +555,10 @@ async function setupOffscreenDocument() {
   try {
     await chrome.offscreen.createDocument({
       url: "dist/offscreen.html",
-      // path relative to extension root
-      reasons: [chrome.offscreen.Reason.USER_MEDIA],
+      reasons: [
+        chrome.offscreen.Reason.USER_MEDIA,
+        chrome.offscreen.Reason.DISPLAY_MEDIA
+      ],
       justification: "Recording screen and microphone required for core functionality"
     });
     await new Promise((r) => setTimeout(r, 200));
@@ -560,46 +585,61 @@ function stopBadgeTimer() {
   actionAdapter.setBadgeText("");
 }
 async function handleRecordingComplete(buffer, mimeType, size) {
+  logger.info("ServiceWorker", "RECORDING_COMPLETE_RECEIVED", { sizeBytes: size, mimeType, bufferByteLength: buffer?.byteLength });
   stopBadgeTimer();
   lastBuffer = buffer;
   lastMimeType = mimeType;
   const blob = new Blob([buffer], { type: mimeType });
   const session = appState.get("activeSession");
-  if (!session) return;
+  if (!session) {
+    logger.error("ServiceWorker", "NO_ACTIVE_SESSION_ON_COMPLETE");
+    return;
+  }
+  logger.info("ServiceWorker", "PROCESSING_START", { sessionId: session.id, fileSizeBytes: size });
   session.status = "processing";
   session.fileSizeBytes = size;
   appState.set("activeSession", session);
   appState.set("status", "processing");
   try {
+    logger.info("ServiceWorker", "COMPRESSION_START", { sessionId: session.id });
     const compressedBlob = await compressionModule.compress(blob, session.id);
+    logger.info("ServiceWorker", "COMPRESSION_DONE", { original: size, compressed: compressedBlob.size });
     session.status = "uploading";
     appState.set("activeSession", session);
     appState.set("status", "uploading");
+    logger.info("ServiceWorker", "UPLOAD_START", { sessionId: session.id });
     const result = await uploadManager.upload(compressedBlob, session, (progress) => {
+      logger.debug("ServiceWorker", "UPLOAD_PROGRESS", { percent: progress.percent, uploaded: progress.uploadedBytes });
       appState.set("uploadProgress", progress);
     });
     if (result.success) {
+      logger.info("ServiceWorker", "UPLOAD_SUCCESS", { url: result.url, accountId: result.accountId });
       session.status = "success";
       session.uploadUrl = result.url;
       session.uploadedToAccountId = result.accountId;
     } else {
+      logger.error("ServiceWorker", "UPLOAD_FAILED", { error: result.error });
       session.status = "error";
       session.error = result.error;
     }
   } catch (e) {
+    logger.error("ServiceWorker", "PIPELINE_ERROR", { error: e.message, stack: e.stack });
     session.status = "error";
     session.error = new AppError("COMPRESSION_FAILED", e.message, false).toJSON();
   }
   appState.set("activeSession", session);
   appState.set("status", session.status);
+  logger.info("ServiceWorker", "SESSION_FINAL_STATUS", { status: session.status });
   chrome.offscreen.closeDocument().catch(() => {
   });
 }
 chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
   if (message.type === "RECORDING_COMPLETE") {
+    logger.info("ServiceWorker", "MSG_IN:RECORDING_COMPLETE", { size: message.size, mimeType: message.mimeType, bufferByteLength: message.buffer?.byteLength });
     handleRecordingComplete(message.buffer, message.mimeType, message.size);
     return;
   }
+  logger.debug("ServiceWorker", `MSG_IN:${message.type}`, { from: sender?.id || "popup", keys: Object.keys(message) });
   (async () => {
     try {
       switch (message.type) {
@@ -615,6 +655,7 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
         case "START_RECORDING":
           const target = message.target;
           const sessionId = crypto.randomUUID();
+          logger.info("ServiceWorker", "START_RECORDING", { type: target.type, hasStreamId: !!target.streamId, sessionId });
           const newSession = {
             id: sessionId,
             startedAt: Date.now(),
@@ -622,13 +663,18 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
             status: "recording"
           };
           try {
+            logger.info("ServiceWorker", "OFFSCREEN_SETUP_START");
             await setupOffscreenDocument();
+            logger.info("ServiceWorker", "OFFSCREEN_SETUP_DONE");
+            await new Promise((r) => setTimeout(r, 100));
           } catch (e) {
+            logger.error("ServiceWorker", "OFFSCREEN_SETUP_FAILED", { error: e.message });
             sendResponse({ success: false, error: "Failed to initialize recording environment: " + e.message });
             return;
           }
           appState.set("activeSession", newSession);
           appState.set("status", "recording");
+          logger.info("ServiceWorker", "SENDING_TO_OFFSCREEN", { streamIdPrefix: target.streamId?.substring(0, 20) });
           chrome.runtime.sendMessage({
             target: "offscreen",
             type: "START_RECORDING",
@@ -637,16 +683,19 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
           }, (response) => {
             if (chrome.runtime.lastError || !response?.success) {
               const error = chrome.runtime.lastError?.message || response?.error || "Failed to start recording";
+              logger.error("ServiceWorker", "OFFSCREEN_START_FAILED", { error });
               appState.set("status", "idle");
               appState.set("activeSession", null);
               sendResponse({ success: false, error });
             } else {
+              logger.info("ServiceWorker", "OFFSCREEN_START_SUCCESS", { sessionId });
               startBadgeTimer(newSession.startedAt);
               sendResponse({ success: true, sessionId });
             }
           });
           break;
         case "CANCEL_RECORDING":
+          logger.info("ServiceWorker", "CANCEL_RECORDING");
           chrome.runtime.sendMessage({ target: "offscreen", type: "STOP_RECORDING" });
           appState.set("status", "idle");
           appState.set("activeSession", null);
@@ -654,19 +703,25 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
           sendResponse({ success: true });
           break;
         case "STOP_RECORDING":
+          logger.info("ServiceWorker", "STOP_RECORDING_FORWARDED");
           chrome.runtime.sendMessage({ target: "offscreen", type: "STOP_RECORDING" });
           sendResponse({ success: true });
           break;
         case "GET_ACCOUNTS":
           const accounts = await accountManager.getAccounts();
+          logger.debug("ServiceWorker", "GET_ACCOUNTS", { count: accounts.length });
           sendResponse({ accounts });
           break;
         case "CONNECT_ACCOUNT":
+          logger.info("ServiceWorker", "CONNECT_ACCOUNT_START");
           const account = await accountManager.connectAccount();
+          logger.info("ServiceWorker", "CONNECT_ACCOUNT_DONE", { id: account?.id });
           sendResponse({ account });
           break;
         case "CONNECT_MOCK_ACCOUNT":
+          logger.info("ServiceWorker", "CONNECT_MOCK_ACCOUNT_START");
           const mock = await accountManager.connectMockAccount();
+          logger.info("ServiceWorker", "CONNECT_MOCK_ACCOUNT_DONE", { id: mock?.id });
           sendResponse({ account: mock });
           break;
         case "DISCONNECT_ACCOUNT":
@@ -674,15 +729,18 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
           sendResponse({ success: true });
           break;
         case "GET_RECORDING_BUFFER":
+          logger.debug("ServiceWorker", "GET_RECORDING_BUFFER", { hasBuffer: !!lastBuffer, bufferSize: lastBuffer?.byteLength });
           sendResponse({ buffer: lastBuffer, mimeType: lastMimeType });
           break;
         case "GET_LOGS":
           sendResponse({ logs: logger.getLogs() });
           break;
         default:
+          logger.warn("ServiceWorker", "UNKNOWN_MESSAGE", { type: message.type });
           sendResponse({ success: false, error: "Unknown message type" });
       }
     } catch (e) {
+      logger.error("ServiceWorker", "MSG_HANDLER_EXCEPTION", { type: message.type, error: e.message, stack: e.stack });
       sendResponse({ success: false, error: e.message });
     }
   })();

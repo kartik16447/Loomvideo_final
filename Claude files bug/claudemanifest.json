@@ -11,13 +11,11 @@
     "offscreen",
     "scripting",
     "activeTab",
-    "downloads",
-    "desktopCapture"
+    "downloads"
   ],
   "host_permissions": [
     "https://www.googleapis.com/*",
-    "https://oauth2.googleapis.com/*",
-    "<all_urls>"
+    "https://oauth2.googleapis.com/*"
   ],
   "background": {
     "service_worker": "dist/service-worker.js",
@@ -48,14 +46,6 @@
     {
       "resources": ["dist/ui/player/player.html", "dist/ui/player/player.js"],
       "matches": ["<all_urls>"]
-    }
-  ],
-  "content_scripts": [
-    {
-      "matches": ["<all_urls>"],
-      "js": ["dist/content.js"],
-      "css": ["dist/content.css"],
-      "all_frames": false
     }
   ]
 }

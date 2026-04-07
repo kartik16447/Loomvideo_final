@@ -51,10 +51,16 @@ class PopupController {
     });
 
     (globalThis as any).SV_DEBUG = {
-      getState: () => this.sendMessage('GET_STATE').then(console.table),
-      getLogs: () => this.sendMessage('GET_LOGS').then(console.table),
-      reset: () => chrome.storage.local.clear().then(() => location.reload())
+      getState: () => this.sendMessage('GET_STATE').then(s => { console.table(s); return s; }),
+      getLogs:  () => this.sendMessage('GET_LOGS').then(r => { console.table(r.logs); return r.logs; }),
+      dumpLogs: () => this.sendMessage('GET_LOGS').then(r => r.logs?.forEach((l: any) => console.log(`[${l.level}][${l.module}] ${l.action}`, l.data || ''))),
+      reset:    () => chrome.storage.local.clear().then(() => location.reload()),
+      startMock: () => {
+        console.log('[SV_DEBUG] Connecting mock account...');
+        return (globalThis as any).SV_DEBUG.getState();
+      }
     };
+    console.log('%c[ScreenVault Popup] Debug ready → call SV_DEBUG.dumpLogs() or SV_DEBUG.getState()', 'color:#3B82F6; font-weight:bold');
 
     document.getElementById('btn-back')!.addEventListener('click', () => {
       this.showScreen('idle');
@@ -137,28 +143,34 @@ class PopupController {
   }
 
   private async startRecording(target: RecordingTarget) {
-    // MV3 FIX: We must request Desktop Media from the foreground UI to grant permissions
+    console.log('%c[Popup] startRecording called', 'color:#3B82F6; font-weight:bold', target);
     if (target.type === 'screen' || target.type === 'window') {
+      console.log('[Popup] Calling chooseDesktopMedia for type:', target.type);
       chrome.desktopCapture.chooseDesktopMedia(['screen', 'window', 'tab'], (streamId) => {
         if (!streamId) {
+          console.error('[Popup] chooseDesktopMedia returned no streamId — user cancelled or permission denied');
           this.showError('Screen capture permission denied');
           return;
         }
-        // Proceed with streamId attached to target
+        console.log('[Popup] Got streamId from chooseDesktopMedia:', streamId.substring(0, 20) + '...');
         this.sendStartRecording({ ...target, streamId });
       });
     } else {
-      // Tab targets don't strictly require chooseDesktopMedia if using tabCapture
+      console.log('[Popup] Tab target — skipping chooseDesktopMedia, using tabCapture', { tabId: (target as any).tabId });
       this.sendStartRecording(target);
     }
   }
 
   private async sendStartRecording(target: any) {
+    console.log('[Popup] Sending START_RECORDING to background', { targetType: target.type, hasStreamId: !!target.streamId });
     const res = await this.sendMessage('START_RECORDING', { target });
+    console.log('[Popup] START_RECORDING response:', res);
     if (res.success) {
+      console.log('[Popup] Recording started successfully, sessionId:', res.sessionId);
       this.showScreen('recording');
       setTimeout(() => window.close(), 1500);
     } else {
+      console.error('[Popup] START_RECORDING failed:', res.error);
       this.showError(res.error || 'Recording failed to start');
     }
   }
@@ -229,11 +241,14 @@ class PopupController {
   }
 
   private sendMessage(type: string, payload: any = {}): Promise<any> {
+    console.debug(`[Popup→SW] → ${type}`, Object.keys(payload).length ? payload : '');
     return new Promise(resolve => {
       chrome.runtime.sendMessage({ type, ...payload }, (res) => {
         if (chrome.runtime.lastError) {
+          console.error(`[Popup→SW] ✗ ${type} error:`, chrome.runtime.lastError.message);
           resolve({ success: false, error: chrome.runtime.lastError.message });
         } else {
+          console.debug(`[Popup→SW] ✓ ${type} response:`, res);
           resolve(res || { success: false });
         }
       });
