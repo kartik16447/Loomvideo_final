@@ -529,12 +529,18 @@ async function setupOffscreenDocument() {
     contextTypes: [chrome.runtime.ContextType.OFFSCREEN_DOCUMENT]
   });
   if (existingContexts.length > 0) return;
-  await chrome.offscreen.createDocument({
-    url: "dist/offscreen.html",
-    // path relative to MV3 root when built
-    reasons: [chrome.offscreen.Reason.USER_MEDIA],
-    justification: "Recording screen and microphone required for core functionality"
-  });
+  try {
+    await chrome.offscreen.createDocument({
+      url: "dist/offscreen.html",
+      // path relative to extension root
+      reasons: [chrome.offscreen.Reason.USER_MEDIA],
+      justification: "Recording screen and microphone required for core functionality"
+    });
+    await new Promise((r) => setTimeout(r, 200));
+  } catch (e) {
+    logger.error("ServiceWorker", "OFFSCREEN_CREATE_FAILED", { error: e.message });
+    throw e;
+  }
 }
 function startBadgeTimer(startTime) {
   if (badgeInterval) clearInterval(badgeInterval);
@@ -615,23 +621,37 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
             target,
             status: "recording"
           };
-          await setupOffscreenDocument();
+          try {
+            await setupOffscreenDocument();
+          } catch (e) {
+            sendResponse({ success: false, error: "Failed to initialize recording environment: " + e.message });
+            return;
+          }
           appState.set("activeSession", newSession);
           appState.set("status", "recording");
           chrome.runtime.sendMessage({
             target: "offscreen",
             type: "START_RECORDING",
-            recordingTarget: target
+            recordingTarget: target,
+            streamId: target.streamId
           }, (response) => {
-            if (!response?.success) {
+            if (chrome.runtime.lastError || !response?.success) {
+              const error = chrome.runtime.lastError?.message || response?.error || "Failed to start recording";
               appState.set("status", "idle");
               appState.set("activeSession", null);
-              sendResponse({ success: false, error: response?.error || "Failed to start recording" });
+              sendResponse({ success: false, error });
             } else {
               startBadgeTimer(newSession.startedAt);
               sendResponse({ success: true, sessionId });
             }
           });
+          break;
+        case "CANCEL_RECORDING":
+          chrome.runtime.sendMessage({ target: "offscreen", type: "STOP_RECORDING" });
+          appState.set("status", "idle");
+          appState.set("activeSession", null);
+          stopBadgeTimer();
+          sendResponse({ success: true });
           break;
         case "STOP_RECORDING":
           chrome.runtime.sendMessage({ target: "offscreen", type: "STOP_RECORDING" });

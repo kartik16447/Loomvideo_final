@@ -13,29 +13,49 @@ export class RecorderModule {
 
   constructor(private tabsAdapter: ITabsAdapter) {}
 
-  async start(target: RecordingTarget, config: RecorderConfig = DEFAULT_CONFIG): Promise<void> {
-    logger.info('RecorderModule', 'START', { target });
+  async start(target: RecordingTarget, config: RecorderConfig = DEFAULT_CONFIG, streamId?: string): Promise<void> {
+    logger.info('RecorderModule', 'START', { target, hasStreamId: !!streamId });
     
-    let screenStream: MediaStream;
+    let screenStream: MediaStream | null = null;
     const audioContext = new globalThis.AudioContext();
 
     try {
-      if (target.type === 'tab') {
+      if (streamId) {
+        logger.info('RecorderModule', 'ATTEMPTING_GET_USER_MEDIA', { streamId });
+        
+        // Try with Audio first
+        try {
+          screenStream = await navigator.mediaDevices.getUserMedia({
+            video: { mandatory: { chromeMediaSource: 'desktop', chromeMediaSourceId: streamId } } as any,
+            audio: { mandatory: { chromeMediaSource: 'desktop', chromeMediaSourceId: streamId } } as any
+          });
+          logger.info('RecorderModule', 'GET_USER_MEDIA_FULL_SUCCESS');
+        } catch (e) {
+          logger.warn('RecorderModule', 'GET_USER_MEDIA_AUDIO_FAILED', { error: (e as Error).message });
+          // Fallback to Video only
+          screenStream = await navigator.mediaDevices.getUserMedia({
+            video: { mandatory: { chromeMediaSource: 'desktop', chromeMediaSourceId: streamId } } as any
+          });
+          logger.info('RecorderModule', 'GET_USER_MEDIA_VIDEO_ONLY_SUCCESS');
+        }
+      } else if (target.type === 'tab') {
         if (!target.tabId) throw new Error('tabId is required for tab recording');
-        const streamId = await this.tabsAdapter.getMediaStreamId(target.tabId);
+        const internalStreamId = await this.tabsAdapter.getMediaStreamId(target.tabId);
         screenStream = await navigator.mediaDevices.getUserMedia({
-          video: {
-            mandatory: {
-              chromeMediaSource: 'tab',
-              chromeMediaSourceId: streamId
-            }
-          } as any
+          video: { mandatory: { chromeMediaSource: 'tab', chromeMediaSourceId: internalStreamId } } as any
         });
       } else {
         screenStream = await navigator.mediaDevices.getDisplayMedia({
           video: { frameRate: config.frameRate },
-          audio: true // Attempt to get system audio
+          audio: true
         });
+      }
+
+      if (!screenStream) throw new Error('Failed to acquire screen stream');
+
+      // Ensure AudioContext is ready (Browser Requirement for Offscreen)
+      if (audioContext.state === 'suspended') {
+        await audioContext.resume();
       }
 
       let micStream: MediaStream | null = null;

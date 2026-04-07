@@ -15,7 +15,7 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
     switch (message.type) {
       case 'START_RECORDING':
         try {
-          await recorder.start(message.recordingTarget, message.config || DEFAULT_CONFIG);
+          await recorder.start(message.recordingTarget, message.config || DEFAULT_CONFIG, message.streamId);
           sendResponse({ success: true });
         } catch (e: any) {
           logger.error('Offscreen', 'START_ERROR', { error: e.message });

@@ -161,6 +161,19 @@ var PopupController = class {
     });
   }
   async startRecording(target) {
+    if (target.type === "screen" || target.type === "window") {
+      chrome.desktopCapture.chooseDesktopMedia(["screen", "window", "tab"], (streamId) => {
+        if (!streamId) {
+          this.showError("Screen capture permission denied");
+          return;
+        }
+        this.sendStartRecording({ ...target, streamId });
+      });
+    } else {
+      this.sendStartRecording(target);
+    }
+  }
+  async sendStartRecording(target) {
     const res = await this.sendMessage("START_RECORDING", { target });
     if (res.success) {
       this.showScreen("recording");

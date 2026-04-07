@@ -1,96 +1,97 @@
 #screenvault-tray-root {
   position: fixed;
-  left: 0;
-  top: 50%;
-  transform: translateY(-50%) translateX(-85%);
-  width: 250px;
-  background: #111111;
-  border: 1px solid #333;
-  border-left: none;
-  border-radius: 0 12px 12px 0;
-  z-index: 2147483647; /* MAX Z-INDEX */
-  color: #f5f5f5;
-  font-family: system-ui, sans-serif;
-  box-shadow: 4px 4px 15px rgba(0,0,0,0.5);
-  transition: transform 0.3s cubic-bezier(0.4, 0, 0.2, 1);
-  display: flex;
-  flex-direction: column;
-  padding: 16px;
-  box-sizing: border-box;
-}
-
-#screenvault-tray-root:hover {
-  transform: translateY(-50%) translateX(0);
-}
-
-#screenvault-tray-root .sv-flex {
+  bottom: 32px;
+  left: 32px;
+  background: rgba(15, 15, 15, 0.95);
+  backdrop-filter: blur(12px);
+  -webkit-backdrop-filter: blur(12px);
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  border-radius: 40px;
+  z-index: 2147483647;
+  color: #fff;
+  font-family: -apple-system, BlinkMacSystemFont, "Inter", "Segoe UI", sans-serif;
+  box-shadow: 0 12px 36px rgba(0,0,0,0.4), 0 0 0 1px rgba(255,255,255,0.05);
   display: flex;
   align-items: center;
-  justify-content: space-between;
-  width: 100%;
+  padding: 6px 8px 6px 16px;
+  gap: 16px;
+  transition: transform 0.2s cubic-bezier(0.4, 0, 0.2, 1);
+  user-select: none;
 }
 
-#screenvault-tray-root .sv-pulse {
-  width: 12px;
-  height: 12px;
+.sv-drag-handle {
+  cursor: grab;
+  color: #666;
+  display: flex;
+  font-size: 16px;
+  letter-spacing: -2px;
+  margin-right: -4px;
+}
+.sv-drag-handle:hover { color: #aaa; }
+
+.sv-timer-group {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.sv-pulse {
+  width: 10px;
+  height: 10px;
   background: #ef4444;
   border-radius: 50%;
-  animation: sv-pulse-anim 1.5s infinite;
-  margin-right: 12px;
+  animation: sv-pulse-anim 2s infinite;
 }
 
 @keyframes sv-pulse-anim {
-  0% { transform: scale(1); box-shadow: 0 0 0 0 rgba(239, 68, 68, 0.4); }
-  50% { transform: scale(1.3); box-shadow: 0 0 0 4px rgba(239, 68, 68, 0); }
-  100% { transform: scale(1); box-shadow: 0 0 0 0 rgba(239, 68, 68, 0); }
+  0% { box-shadow: 0 0 0 0 rgba(239, 68, 68, 0.4); }
+  70% { box-shadow: 0 0 0 6px rgba(239, 68, 68, 0); }
+  100% { box-shadow: 0 0 0 0 rgba(239, 68, 68, 0); }
 }
 
-#screenvault-tray-root .sv-timer {
-  font-family: monospace;
-  font-size: 16px;
-  font-weight: bold;
+.sv-timer {
+  font-variant-numeric: tabular-nums;
+  font-weight: 500;
+  font-size: 15px;
+  letter-spacing: 0.5px;
 }
 
-#screenvault-tray-root .sv-stop-btn {
-  margin-top: 16px;
-  background: #ef4444;
-  color: white;
-  border: none;
-  border-radius: 6px;
-  padding: 8px 16px;
-  font-weight: 600;
-  cursor: pointer;
+.sv-divider {
+  width: 1px;
+  height: 24px;
+  background: rgba(255, 255, 255, 0.15);
+}
+
+.sv-btn-group {
   display: flex;
   align-items: center;
-  justify-content: center;
   gap: 8px;
-  transition: background 0.15s ease;
 }
 
-#screenvault-tray-root .sv-stop-btn:hover {
-  background: #dc2626;
-}
-
-#screenvault-tray-root .sv-square {
-  font-size: 10px;
-}
-
-#screenvault-tray-root .sv-drag-handle {
-  position: absolute;
-  right: 0;
-  top: 0;
-  bottom: 0;
-  width: 24px;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  color: #666;
-  opacity: 0.8;
-  font-size: 20px;
-  user-select: none;
+.sv-icon-btn {
+  width: 36px;
+  height: 36px;
+  border-radius: 50%;
+  border: none;
+  background: rgba(255, 255, 255, 0.1);
+  color: white;
   cursor: pointer;
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  transition: all 0.2s;
 }
 
-#screenvault-tray-root .sv-drag-handle:hover {
-  color: #fff;
+.sv-icon-btn:hover { 
+  background: rgba(255, 255, 255, 0.2); 
+  transform: scale(1.05); 
+}
+
+.sv-icon-btn.sv-stop:hover { background: #ef4444; }
+
+.sv-square {
+  width: 12px;
+  height: 12px;
+  background: currentColor;
+  border-radius: 2px;
 }

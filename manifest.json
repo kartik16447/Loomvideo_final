@@ -11,7 +11,8 @@
     "offscreen",
     "scripting",
     "activeTab",
-    "downloads"
+    "downloads",
+    "desktopCapture"
   ],
   "host_permissions": [
     "https://www.googleapis.com/*",

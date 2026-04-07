@@ -137,6 +137,23 @@ class PopupController {
   }
 
   private async startRecording(target: RecordingTarget) {
+    // MV3 FIX: We must request Desktop Media from the foreground UI to grant permissions
+    if (target.type === 'screen' || target.type === 'window') {
+      chrome.desktopCapture.chooseDesktopMedia(['screen', 'window', 'tab'], (streamId) => {
+        if (!streamId) {
+          this.showError('Screen capture permission denied');
+          return;
+        }
+        // Proceed with streamId attached to target
+        this.sendStartRecording({ ...target, streamId });
+      });
+    } else {
+      // Tab targets don't strictly require chooseDesktopMedia if using tabCapture
+      this.sendStartRecording(target);
+    }
+  }
+
+  private async sendStartRecording(target: any) {
     const res = await this.sendMessage('START_RECORDING', { target });
     if (res.success) {
       this.showScreen('recording');
